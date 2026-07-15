@@ -1,0 +1,20 @@
+name: Build ECharts corpus
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone official examples
+        run: git clone --depth 1 https://github.com/apache/echarts-examples.git echarts-examples
+      - name: Package source corpus
+        run: |
+          cd echarts-examples
+          zip -r ../echarts-official-corpus.zip src/data src/common public/examples public/data package.json README.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: echarts-official-corpus
+          path: echarts-official-corpus.zip
+          retention-days: 1
