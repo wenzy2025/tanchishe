@@ -75,8 +75,9 @@ jobs:
               visible.append(x)
 
           for e in gl_examples:
+              eid = e.get('id','')
               cats = [c for c in e.get('category',[]) if c in categories]
-              if not cats:
+              if not cats or eid in black:
                   continue
               x = dict(e)
               x['_cats'] = cats
