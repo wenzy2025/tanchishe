@@ -1,0 +1,149 @@
+name: Build ECharts Prompt Package
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate categorized prompts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import csv
+          import json
+          import re
+          import shutil
+          import urllib.request
+          import zipfile
+          from pathlib import Path
+
+          categories = [
+              'line','bar','pie','scatter','map','candlestick','radar','boxplot','heatmap','graph',
+              'lines','tree','treemap','sunburst','parallel','sankey','funnel','gauge','pictorialBar',
+              'themeRiver','calendar','matrix','chord','custom','dataset','dataZoom','graphic','rich',
+              'globe','bar3D','scatter3D','surface','map3D','lines3D','line3D','scatterGL','linesGL',
+              'flowGL','graphGL'
+          ]
+          cn = {
+              'line':'折线图','bar':'柱状图','pie':'饼图','scatter':'散点图','map':'地图',
+              'candlestick':'K线图','radar':'雷达图','boxplot':'箱线图','heatmap':'热力图',
+              'graph':'关系图','lines':'路径图','tree':'树图','treemap':'矩形树图','sunburst':'旭日图',
+              'parallel':'平行坐标图','sankey':'桑基图','funnel':'漏斗图','gauge':'仪表盘',
+              'pictorialBar':'象形柱图','themeRiver':'主题河流图','calendar':'日历图','matrix':'矩阵图',
+              'chord':'和弦图','custom':'自定义图','dataset':'数据集组件','dataZoom':'数据缩放',
+              'graphic':'图形组件','rich':'富文本','globe':'三维地球','bar3D':'三维柱状图',
+              'scatter3D':'三维散点图','surface':'三维曲面图','map3D':'三维地图',
+              'lines3D':'三维路径图','line3D':'三维折线图','scatterGL':'大规模散点图',
+              'linesGL':'大规模路径图','flowGL':'流场图','graphGL':'大规模关系图'
+          }
+          black = {
+              'lines-airline','scatter-world-population','geo3d','geo3d-with-different-height',
+              'globe-country-carousel','globe-with-echarts-surface','map3d-alcohol-consumption',
+              'map3d-wood-map','scattergl-weibo','heatmap-bmap','effectScatter-bmap','lines-bmap',
+              'lines-bmap-bus','lines-bmap-effect','map-bin','global-wind-visualization',
+              'global-wind-visualization-2'
+          }
+
+          def safe_name(value, maxlen=145):
+              value = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '_', str(value))
+              value = re.sub(r'\s+', ' ', value).strip().strip('.')
+              return (value[:maxlen] or 'unnamed')
+
+          url = 'https://raw.githubusercontent.com/apache/echarts-examples/master/src/data/chart-list-data.js'
+          text = urllib.request.urlopen(url, timeout=60).read().decode('utf-8')
+          body = text[text.index('export default') + len('export default'):].strip()
+          if body.endswith(';'):
+              body = body[:-1]
+          examples = json.loads(body)
+
+          visible = []
+          for e in examples:
+              eid = e.get('id','')
+              cats = [c for c in e.get('category',[]) if c in categories]
+              if not cats or e.get('noExplore') or eid in black:
+                  continue
+              e = dict(e)
+              e['_cats'] = cats
+              visible.append(e)
+
+          memberships = sum(len(e['_cats']) for e in visible)
+          if len(visible) != 329 or memberships != 365:
+              raise RuntimeError(f'Expected 329 visible examples and 365 category memberships; got {len(visible)} and {memberships}')
+
+          root = Path('ECharts_365个简洁提示词_网页PNG下载按钮')
+          if root.exists():
+              shutil.rmtree(root)
+          root.mkdir()
+
+          all_lines = ['# ECharts 365个简洁提示词', '']
+          index_rows = []
+          prompt_count = 0
+
+          for i, cat in enumerate(categories, 1):
+              folder_name = f'{i:02d}_{cat}_{cn[cat]}'
+              folder = root / folder_name
+              folder.mkdir()
+              members = sorted((e for e in visible if cat in e['_cats']), key=lambda x: x['id'])
+              category_lines = [f'# {cn[cat]}提示词', '']
+
+              for e in members:
+                  eid = e['id']
+                  title = e.get('title') or e.get('titleCN') or eid
+                  chart_name = e.get('titleCN') or title
+                  dataset_base = safe_name(f'{eid}__{title}')
+                  dataset_rel = f'{folder_name}/{dataset_base}.xlsx'
+                  prompt = (
+                      f'请使用技能 echarts-master，读取我上传的数据集“{dataset_rel}”，'
+                      f'生成“{chart_name}”网页，同时生成一张PNG图片，并在网页上添加“下载图片”按钮，'
+                      f'点击后可下载该图表PNG图片。'
+                  )
+                  prompt_file = safe_name(f'{eid}__{title}__提示词') + '.md'
+                  (folder / prompt_file).write_text(prompt + '\n', encoding='utf-8')
+                  category_lines += [f'## {chart_name}', '', prompt, '']
+                  all_lines += [f'## {folder_name} / {chart_name}', '', prompt, '']
+                  index_rows.append([i, cat, cn[cat], eid, title, chart_name, dataset_rel, f'{folder_name}/{prompt_file}', prompt])
+                  prompt_count += 1
+
+              (folder / '00_本分类全部提示词.md').write_text('\n'.join(category_lines), encoding='utf-8')
+
+          (root / '00_全部提示词汇总.md').write_text('\n'.join(all_lines), encoding='utf-8')
+          (root / 'README_使用说明.md').write_text(
+              '# 使用说明\n\n'
+              '本压缩包包含39个分类、365个独立提示词。每个提示词只读取一个Excel数据集，'
+              '使用 echarts-master 生成一个网页、一张PNG图片，并在网页中添加下载图片按钮。\n',
+              encoding='utf-8'
+          )
+          with (root / '00_提示词目录.csv').open('w', newline='', encoding='utf-8-sig') as f:
+              w = csv.writer(f)
+              w.writerow(['分类序号','分类代码','分类中文名','示例ID','英文标题','图表名称','数据集路径','提示词路径','提示词'])
+              w.writerows(index_rows)
+
+          zip_path = Path('ECharts_365个简洁提示词_网页PNG下载按钮.zip')
+          with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+              for p in root.rglob('*'):
+                  if p.is_file():
+                      z.write(p, p)
+
+          with zipfile.ZipFile(zip_path) as z:
+              bad = z.testzip()
+              names = z.namelist()
+          folders = len([p for p in root.iterdir() if p.is_dir()])
+          individual = len([p for p in root.rglob('*__提示词.md')])
+          assert bad is None
+          assert folders == 39
+          assert individual == 365
+          assert prompt_count == 365
+          print(json.dumps({'visible_examples':len(visible),'memberships':memberships,'folders':folders,'individual_prompts':individual,'zip_files':len(names),'zip_bytes':zip_path.stat().st_size}, ensure_ascii=False))
+          PY
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: echarts-365-simple-prompts
+          path: ECharts_365个简洁提示词_网页PNG下载按钮.zip
+          if-no-files-found: error
+          retention-days: 1
