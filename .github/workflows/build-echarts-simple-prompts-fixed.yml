@@ -1,0 +1,28 @@
+name: Build ECharts Simple Prompts Fixed
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone official examples
+        run: git clone --depth 1 --branch gh-pages https://github.com/apache/echarts-examples.git /tmp/echarts-examples
+      - name: Generate prompt pack
+        run: python3 scripts/build_echarts_simple_prompts.py
+      - name: Upload prompt pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: echarts-365-simple-prompts-fixed
+          path: |
+            ECharts_365个简洁单图提示词.zip
+            ECharts_365个简洁单图提示词/00_全部简洁提示词汇总.md
+            ECharts_365个简洁单图提示词/00_简洁提示词目录.csv
+            ECharts_365个简洁单图提示词/VALIDATION.json
+          if-no-files-found: error
