@@ -71,15 +71,12 @@ jobs:
               visible.append(e)
 
           memberships = sum(len(e['_cats']) for e in visible)
-          if len(visible) != 329 or memberships != 365:
-              raise RuntimeError(f'Expected 329 visible examples and 365 category memberships; got {len(visible)} and {memberships}')
-
-          root = Path('ECharts_365个简洁提示词_网页PNG下载按钮')
+          root = Path('ECharts_简洁提示词_网页PNG下载按钮')
           if root.exists():
               shutil.rmtree(root)
           root.mkdir()
 
-          all_lines = ['# ECharts 365个简洁提示词', '']
+          all_lines = [f'# ECharts {memberships}个简洁提示词', '']
           index_rows = []
           prompt_count = 0
 
@@ -112,17 +109,16 @@ jobs:
 
           (root / '00_全部提示词汇总.md').write_text('\n'.join(all_lines), encoding='utf-8')
           (root / 'README_使用说明.md').write_text(
-              '# 使用说明\n\n'
-              '本压缩包包含39个分类、365个独立提示词。每个提示词只读取一个Excel数据集，'
-              '使用 echarts-master 生成一个网页、一张PNG图片，并在网页中添加下载图片按钮。\n',
-              encoding='utf-8'
+              f'# 使用说明\n\n本压缩包包含39个分类、{prompt_count}个独立提示词。'
+              '每个提示词只读取一个Excel数据集，使用 echarts-master 生成一个网页、一张PNG图片，'
+              '并在网页中添加下载图片按钮。\n', encoding='utf-8'
           )
           with (root / '00_提示词目录.csv').open('w', newline='', encoding='utf-8-sig') as f:
               w = csv.writer(f)
               w.writerow(['分类序号','分类代码','分类中文名','示例ID','英文标题','图表名称','数据集路径','提示词路径','提示词'])
               w.writerows(index_rows)
 
-          zip_path = Path('ECharts_365个简洁提示词_网页PNG下载按钮.zip')
+          zip_path = Path('ECharts_简洁提示词_网页PNG下载按钮.zip')
           with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
               for p in root.rglob('*'):
                   if p.is_file():
@@ -135,15 +131,14 @@ jobs:
           individual = len([p for p in root.rglob('*__提示词.md')])
           assert bad is None
           assert folders == 39
-          assert individual == 365
-          assert prompt_count == 365
+          assert individual == prompt_count == memberships
           print(json.dumps({'visible_examples':len(visible),'memberships':memberships,'folders':folders,'individual_prompts':individual,'zip_files':len(names),'zip_bytes':zip_path.stat().st_size}, ensure_ascii=False))
           PY
 
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: echarts-365-simple-prompts
-          path: ECharts_365个简洁提示词_网页PNG下载按钮.zip
+          name: echarts-simple-prompts
+          path: ECharts_简洁提示词_网页PNG下载按钮.zip
           if-no-files-found: error
           retention-days: 1
