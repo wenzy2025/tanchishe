@@ -40,13 +40,6 @@ jobs:
               'lines3D':'三维路径图','line3D':'三维折线图','scatterGL':'大规模散点图',
               'linesGL':'大规模路径图','flowGL':'流场图','graphGL':'大规模关系图'
           }
-          black = {
-              'lines-airline','scatter-world-population','geo3d','geo3d-with-different-height',
-              'globe-country-carousel','globe-with-echarts-surface','map3d-alcohol-consumption',
-              'map3d-wood-map','scattergl-weibo','heatmap-bmap','effectScatter-bmap','lines-bmap',
-              'lines-bmap-bus','lines-bmap-effect','map-bin','global-wind-visualization',
-              'global-wind-visualization-2'
-          }
 
           def safe_name(value, maxlen=145):
               value = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '_', str(value))
@@ -62,21 +55,23 @@ jobs:
 
           visible = []
           for e in examples:
-              eid = e.get('id','')
               cats = [c for c in e.get('category',[]) if c in categories]
-              if not cats or e.get('noExplore') or eid in black:
+              if not cats:
                   continue
               e = dict(e)
               e['_cats'] = cats
               visible.append(e)
 
           memberships = sum(len(e['_cats']) for e in visible)
-          root = Path('ECharts_简洁提示词_网页PNG下载按钮')
+          if len(visible) != 329 or memberships != 365:
+              raise RuntimeError(f'Expected 329 examples and 365 category memberships; got {len(visible)} and {memberships}')
+
+          root = Path('ECharts_365个简洁提示词_网页PNG下载按钮')
           if root.exists():
               shutil.rmtree(root)
           root.mkdir()
 
-          all_lines = [f'# ECharts {memberships}个简洁提示词', '']
+          all_lines = ['# ECharts 365个简洁提示词', '']
           index_rows = []
           prompt_count = 0
 
@@ -109,7 +104,7 @@ jobs:
 
           (root / '00_全部提示词汇总.md').write_text('\n'.join(all_lines), encoding='utf-8')
           (root / 'README_使用说明.md').write_text(
-              f'# 使用说明\n\n本压缩包包含39个分类、{prompt_count}个独立提示词。'
+              '# 使用说明\n\n本压缩包包含39个分类、365个独立提示词。'
               '每个提示词只读取一个Excel数据集，使用 echarts-master 生成一个网页、一张PNG图片，'
               '并在网页中添加下载图片按钮。\n', encoding='utf-8'
           )
@@ -118,7 +113,7 @@ jobs:
               w.writerow(['分类序号','分类代码','分类中文名','示例ID','英文标题','图表名称','数据集路径','提示词路径','提示词'])
               w.writerows(index_rows)
 
-          zip_path = Path('ECharts_简洁提示词_网页PNG下载按钮.zip')
+          zip_path = Path('ECharts_365个简洁提示词_网页PNG下载按钮.zip')
           with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
               for p in root.rglob('*'):
                   if p.is_file():
@@ -131,14 +126,14 @@ jobs:
           individual = len([p for p in root.rglob('*__提示词.md')])
           assert bad is None
           assert folders == 39
-          assert individual == prompt_count == memberships
+          assert individual == prompt_count == memberships == 365
           print(json.dumps({'visible_examples':len(visible),'memberships':memberships,'folders':folders,'individual_prompts':individual,'zip_files':len(names),'zip_bytes':zip_path.stat().st_size}, ensure_ascii=False))
           PY
 
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: echarts-simple-prompts
-          path: ECharts_简洁提示词_网页PNG下载按钮.zip
+          name: echarts-365-simple-prompts-final
+          path: ECharts_365个简洁提示词_网页PNG下载按钮.zip
           if-no-files-found: error
           retention-days: 1
