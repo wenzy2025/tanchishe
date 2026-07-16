@@ -1,0 +1,48 @@
+name: Build ECharts Simple Prompts Final
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone official examples
+        run: git clone --depth 1 --branch gh-pages https://github.com/apache/echarts-examples.git /tmp/echarts-examples
+      - name: Match the uploaded 365-dataset inventory
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/build_echarts_simple_prompts.py')
+          s=p.read_text(encoding='utf-8')
+          old="    'global-wind-visualization-2'\n}"
+          new="    'global-wind-visualization-2',\n    'bar3d-mapbox-view-change','bar3d-music-visualization','bar3d-on-mapbox','bar3d-shanghai',\n    'scatter3d-shanghai','scatter3d-weibo-checkin-on-mapbox',\n    'map3d-buildings-on-mapbox','map3d-colorful-cities',\n    'map3d-plastic-material-style-buildings-on-mapbox','map3d-wood-map-on-mapbox',\n    'lines3d-flight-path-on-mapbox','lines3d-taxi-chengdu','lines3d-taxi-routes-of-cape-town'\n}"
+          if old not in s:
+              raise SystemExit('blacklist insertion point not found')
+          p.write_text(s.replace(old,new),encoding='utf-8')
+          PY
+          python3 scripts/build_echarts_simple_prompts.py
+          python3 - <<'PY'
+          import json
+          v=json.load(open('ECharts_365个简洁单图提示词/VALIDATION.json',encoding='utf-8'))
+          assert v['unique_examples']==329, v
+          assert v['prompt_files']==365, v
+          assert not v['mismatches'], v
+          print('Validated:',v['unique_examples'],'unique examples and',v['prompt_files'],'prompt files')
+          PY
+      - name: Upload final prompt pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: echarts-365-simple-prompts-final
+          path: |
+            ECharts_365个简洁单图提示词.zip
+            ECharts_365个简洁单图提示词/00_全部简洁提示词汇总.md
+            ECharts_365个简洁单图提示词/00_简洁提示词目录.csv
+            ECharts_365个简洁单图提示词/VALIDATION.json
+          if-no-files-found: error
