@@ -1,0 +1,62 @@
+name: Export ECharts Metadata
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Export metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import urllib.request
+          from pathlib import Path
+
+          categories = [
+              'line','bar','pie','scatter','map','candlestick','radar','boxplot','heatmap','graph',
+              'lines','tree','treemap','sunburst','parallel','sankey','funnel','gauge','pictorialBar',
+              'themeRiver','calendar','matrix','chord','custom','dataset','dataZoom','graphic','rich',
+              'globe','bar3D','scatter3D','surface','map3D','lines3D','line3D','scatterGL','linesGL',
+              'flowGL','graphGL'
+          ]
+          black = {
+              'lines-airline','scatter-world-population','geo3d','geo3d-with-different-height',
+              'globe-country-carousel','globe-with-echarts-surface','map3d-alcohol-consumption',
+              'map3d-wood-map','scattergl-weibo','heatmap-bmap','effectScatter-bmap','lines-bmap',
+              'lines-bmap-bus','lines-bmap-effect','map-bin','global-wind-visualization',
+              'global-wind-visualization-2'
+          }
+          url='https://raw.githubusercontent.com/apache/echarts-examples/master/src/data/chart-list-data.js'
+          text=urllib.request.urlopen(url,timeout=60).read().decode('utf-8')
+          body=text[text.index('export default')+len('export default'):].strip()
+          if body.endswith(';'): body=body[:-1]
+          examples=json.loads(body)
+          def filtered(mode):
+              out=[]
+              for e in examples:
+                  cats=[c for c in e.get('category',[]) if c in categories]
+                  if not cats: continue
+                  if mode in ('noexplore','both') and e.get('noExplore'): continue
+                  if mode in ('black','both') and e.get('id') in black: continue
+                  x=dict(e); x['_cats']=cats; out.append(x)
+              return out
+          variants={}
+          for mode in ['raw','noexplore','black','both']:
+              arr=filtered(mode)
+              variants[mode]={'unique':len(arr),'memberships':sum(len(x['_cats']) for x in arr),'category_counts':{c:sum(c in x['_cats'] for x in arr) for c in categories}}
+          payload={'categories':categories,'variants':variants,'examples':filtered('raw')}
+          Path('echarts-metadata.json').write_text(json.dumps(payload,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(variants,ensure_ascii=False))
+          PY
+      - name: Upload metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: echarts-metadata
+          path: echarts-metadata.json
+          if-no-files-found: error
+          retention-days: 1
