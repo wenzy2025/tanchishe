@@ -40,27 +40,47 @@ jobs:
               'lines3D':'三维路径图','line3D':'三维折线图','scatterGL':'大规模散点图',
               'linesGL':'大规模路径图','flowGL':'流场图','graphGL':'大规模关系图'
           }
+          black = {
+              'lines-airline','scatter-world-population','geo3d','geo3d-with-different-height',
+              'globe-country-carousel','globe-with-echarts-surface','map3d-alcohol-consumption',
+              'map3d-wood-map','scattergl-weibo','heatmap-bmap','effectScatter-bmap','lines-bmap',
+              'lines-bmap-bus','lines-bmap-effect','map-bin','global-wind-visualization',
+              'global-wind-visualization-2'
+          }
 
           def safe_name(value, maxlen=145):
               value = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '_', str(value))
               value = re.sub(r'\s+', ' ', value).strip().strip('.')
               return (value[:maxlen] or 'unnamed')
 
-          url = 'https://raw.githubusercontent.com/apache/echarts-examples/master/src/data/chart-list-data.js'
-          text = urllib.request.urlopen(url, timeout=60).read().decode('utf-8')
-          body = text[text.index('export default') + len('export default'):].strip()
-          if body.endswith(';'):
-              body = body[:-1]
-          examples = json.loads(body)
+          def load_js_array(url):
+              text = urllib.request.urlopen(url, timeout=60).read().decode('utf-8')
+              body = text[text.index('export default') + len('export default'):].strip()
+              if body.endswith(';'):
+                  body = body[:-1]
+              return json.loads(body)
+
+          base = 'https://raw.githubusercontent.com/apache/echarts-examples/master/src/data/'
+          regular = load_js_array(base + 'chart-list-data.js')
+          gl_examples = load_js_array(base + 'chart-list-data-gl.js')
 
           visible = []
-          for e in examples:
+          for e in regular:
+              eid = e.get('id','')
+              cats = [c for c in e.get('category',[]) if c in categories]
+              if not cats or e.get('noExplore') or eid in black:
+                  continue
+              x = dict(e)
+              x['_cats'] = cats
+              visible.append(x)
+
+          for e in gl_examples:
               cats = [c for c in e.get('category',[]) if c in categories]
               if not cats:
                   continue
-              e = dict(e)
-              e['_cats'] = cats
-              visible.append(e)
+              x = dict(e)
+              x['_cats'] = cats
+              visible.append(x)
 
           memberships = sum(len(e['_cats']) for e in visible)
           if len(visible) != 329 or memberships != 365:
